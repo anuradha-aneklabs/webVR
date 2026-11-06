@@ -3,12 +3,15 @@ import { Hero } from './components/Hero/Hero';
 import { FacilityCards } from './components/FacilityCards/FacilityCards';
 import { FacilityModal } from './components/FacilityCards/FacilityModal';
 import { ParkMapGuide } from './components/MapGuide/ParkMapGuide';
+import { QRScannerPanel } from './components/QRScanner/QRScannerPanel';
 import { QRScannerModal } from './components/QRScanner/QRScannerModal';
+import { DirectionsPanel } from './components/Directions/DirectionsPanel';
 import { AboutModal } from './components/AboutModal/AboutModal';
 import { ExploreMode } from './components/ExploreMode/ExploreMode';
 import { RestaurantTourModal } from './components/RestaurantTour/RestaurantTourModal';
 import { facilities } from './data/facilities';
 import { getRoute } from './data/routes';
+import { parkLocations, allParkNodes } from './data/parkLocations';
 import type { Facility, RouteData } from './types';
 
 export const App: React.FC = () => {
@@ -16,6 +19,8 @@ export const App: React.FC = () => {
   const [currentLocationId, setCurrentLocationId] = useState<string>('entrance');
   const [selectedDestinationId, setSelectedDestinationId] = useState<string>('restaurant');
   const [activeRoute, setActiveRoute] = useState<RouteData | null>(null);
+  const [activeStepIndex, setActiveStepIndex] = useState<number>(0);
+  const [isNavigating, setIsNavigating] = useState<boolean>(false);
 
   // Modals & Fullscreen states
   const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
@@ -26,7 +31,7 @@ export const App: React.FC = () => {
   const [exploreTargetDest, setExploreTargetDest] = useState<string>('restaurant_exterior');
   const [isRestaurantTourOpen, setIsRestaurantTourOpen] = useState<boolean>(false);
 
-  // Calculate route for Park Map Guide on mount and change
+  // Calculate route for Park Map Guide and Directions Panel
   useEffect(() => {
     const route = getRoute(currentLocationId, selectedDestinationId);
     setActiveRoute(route);
@@ -48,6 +53,34 @@ export const App: React.FC = () => {
     setSelectedDestinationId(destId);
     const newRoute = getRoute(currentLocationId, destId);
     setActiveRoute(newRoute);
+    setActiveStepIndex(0);
+  };
+
+  const handleShowRoute = () => {
+    const targetDest = selectedDestinationId || 'restaurant';
+    setSelectedDestinationId(targetDest);
+    const route = getRoute(currentLocationId, targetDest);
+    setActiveRoute(route);
+    setIsNavigating(true);
+    setActiveStepIndex(0);
+  };
+
+  const handleNextStep = () => {
+    if (!activeRoute) return;
+    if (activeStepIndex < activeRoute.navigationSteps.length - 1) {
+      setActiveStepIndex((prev) => prev + 1);
+    }
+  };
+
+  const handlePrevStep = () => {
+    if (activeStepIndex > 0) {
+      setActiveStepIndex((prev) => prev - 1);
+    }
+  };
+
+  const handleResetRoute = () => {
+    setIsNavigating(false);
+    setActiveStepIndex(0);
   };
 
   const handleOpenExploreAt = (locationId: string, destId?: string) => {
@@ -69,12 +102,20 @@ export const App: React.FC = () => {
   const handleLocationDetected = (locId: string) => {
     setCurrentLocationId(locId);
     setExploreStartingLoc(locId);
+    if (selectedDestinationId) {
+      const newRoute = getRoute(locId, selectedDestinationId);
+      setActiveRoute(newRoute);
+      setIsNavigating(true);
+      setActiveStepIndex(0);
+    }
   };
 
   const handleScrollToFacilities = () => {
     const el = document.getElementById('facilities-section');
     el?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  const currentLocObj = allParkNodes.find((l) => l.id === currentLocationId) || parkLocations[0];
 
   return (
     <div className="min-h-screen bg-[#0b110e] text-white flex flex-col justify-start py-1 sm:py-1.5 select-none selection:bg-[#28e070] selection:text-black">
@@ -99,20 +140,45 @@ export const App: React.FC = () => {
           selectedFacilityId={selectedFacility?.id}
         />
 
-        {/* Lower Portion: Compact Park Map Guide in Original 5-Column Placement */}
+        {/* Lower Portion: Original 3-Panel Row matching Reference Layout */}
         <section className="w-full max-w-[1400px] mx-auto px-2 sm:px-3 mb-1.5 sm:mb-2">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 items-stretch">
-            {/* Panel 1: Original Compact Park Map Guide (approx 42% width -> 5 cols out of 12) */}
+            {/* Panel 1: Park Map Guide (approx 42% width -> 5 cols out of 12) */}
             <div className="md:col-span-5 h-full">
               <ParkMapGuide
                 selectedDestinationId={selectedDestinationId}
                 currentLocationId={currentLocationId}
                 activeRoute={activeRoute}
-                activeStepIndex={0}
+                activeStepIndex={isNavigating ? activeStepIndex : 0}
                 onSelectDestination={handleSelectDestination}
                 onExploreRoute={(destId) => {
                   handleOpenExploreAt('entrance', destId);
                 }}
+              />
+            </div>
+
+            {/* Panel 2: Scan for Navigation (approx 25% width -> 3 cols out of 12) */}
+            <div className="md:col-span-3 h-full">
+              <QRScannerPanel
+                onOpenScanner={() => setIsQRModalOpen(true)}
+                currentLocationName={currentLocObj.name.split('&')[0]}
+              />
+            </div>
+
+            {/* Panel 3: Live Turn-by-Turn Guidance (approx 33% width -> 4 cols out of 12) */}
+            <div className="md:col-span-4 h-full">
+              <DirectionsPanel
+                selectedDestinationId={selectedDestinationId}
+                currentLocationId={currentLocationId}
+                activeRoute={activeRoute}
+                activeStepIndex={activeStepIndex}
+                isNavigating={isNavigating}
+                onSelectDestination={handleSelectDestination}
+                onShowRoute={handleShowRoute}
+                onNextStep={handleNextStep}
+                onPrevStep={handlePrevStep}
+                onResetRoute={handleResetRoute}
+                onOpenQR={() => setIsQRModalOpen(true)}
               />
             </div>
           </div>
