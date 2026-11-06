@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, MapPin, Compass, 
   Utensils, Waves, Bed, Trees, Activity, Home, ArrowUp, ArrowLeft, ArrowRight, ArrowDown,
-  Volume2, VolumeX, Sparkles, Footprints, ChevronUp, ChevronDown, Navigation, CheckCircle2, QrCode
+  Volume2, VolumeX, Sparkles, Footprints, ChevronUp, ChevronDown, Navigation, CheckCircle2
 } from 'lucide-react';
 import { exploreLocations } from '../../data/exploreLocations';
 import type { ExploreLocation, Hotspot, WalkWaypoint } from '../../data/exploreLocations';
@@ -74,8 +74,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
   initialLocationId = 'entrance',
   initialDestinationId = 'restaurant_exterior',
   onExit,
-  onSelectOnParkMap,
-  onOpenQR
+  onSelectOnParkMap
 }) => {
   // Guaranteed starting location defaults strictly to Main Entrance
   const [currentLocationId, setCurrentLocationId] = useState<string>(initialLocationId || 'entrance');
@@ -557,16 +556,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
             )}
           </button>
 
-          {onOpenQR && (
-            <button
-              onClick={onOpenQR}
-              className="px-2.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer bg-white/10 text-white hover:bg-white/20 border border-white/15"
-              title="Scan Real Park QR Code"
-            >
-              <QrCode className="w-3.5 h-3.5 text-[#34f480]" />
-              <span className="hidden sm:inline">Scan QR</span>
-            </button>
-          )}
+
 
           <button
             onClick={() => setShowMiniMap(!showMiniMap)}

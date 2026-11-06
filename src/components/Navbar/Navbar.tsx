@@ -1,11 +1,11 @@
 import React from 'react';
-import { Home, LayoutGrid, Info } from 'lucide-react';
+import { Home, Info } from 'lucide-react';
 
 interface NavbarProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenAbout: () => void;
-  onScrollToFacilities: () => void;
+  onScrollToFacilities?: () => void;
   onOpenQR?: () => void;
   onScrollToMap?: () => void;
 }
@@ -13,8 +13,7 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onSelectTab,
-  onOpenAbout,
-  onScrollToFacilities
+  onOpenAbout
 }) => {
   return (
     <header className="w-full pt-3 pb-1 px-4 lg:px-6 relative z-30 select-none">
@@ -54,20 +53,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Explore Park</span>
           </button>
 
-          <button
-            onClick={() => {
-              onSelectTab('facilities');
-              onScrollToFacilities();
-            }}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer ${
-              activeTab === 'facilities'
-                ? 'bg-[#183120] text-[#34f480] border border-[#28e070]/40'
-                : 'text-gray-300 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Facilities</span>
-          </button>
+
 
           <button
             onClick={() => {
