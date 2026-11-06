@@ -55,16 +55,16 @@ export const exploreLocations: ExploreLocation[] = [
         targetLocationId: 'reception',
         label: 'Welcome Reception & Lounge',
         actionText: 'Follow paved driveway through archway to Reception',
-        x: 43,
-        y: 58,
+        x: 60,
+        y: 60,
         direction: 'forward',
         walkWaypoints: [
           { x: 50, y: 92, scale: 1.0, facing: 'away' },
-          { x: 49, y: 82, scale: 0.85, facing: 'away' },
-          { x: 50, y: 74, scale: 0.72, facing: 'away' },
-          { x: 51, y: 68, scale: 0.60, facing: 'away' },
-          { x: 47, y: 63, scale: 0.50, facing: 'left' },
-          { x: 43, y: 58, scale: 0.42, facing: 'away' }
+          { x: 50, y: 83, scale: 0.85, facing: 'away' },
+          { x: 51, y: 75, scale: 0.72, facing: 'away' },
+          { x: 53, y: 69, scale: 0.62, facing: 'away' },
+          { x: 56, y: 64, scale: 0.54, facing: 'away' },
+          { x: 60, y: 60, scale: 0.46, facing: 'away' }
         ]
       },
       {
@@ -72,15 +72,15 @@ export const exploreLocations: ExploreLocation[] = [
         targetLocationId: 'cottages',
         label: 'Forest Chalets Walkway',
         actionText: 'Follow left stone path to Forest Cottages',
-        x: 20,
-        y: 66,
+        x: 17,
+        y: 73,
         direction: 'left',
         walkWaypoints: [
           { x: 50, y: 92, scale: 1.0, facing: 'away' },
-          { x: 46, y: 84, scale: 0.86, facing: 'left' },
-          { x: 38, y: 76, scale: 0.72, facing: 'left' },
-          { x: 28, y: 70, scale: 0.60, facing: 'left' },
-          { x: 20, y: 66, scale: 0.48, facing: 'left' }
+          { x: 44, y: 85, scale: 0.86, facing: 'left' },
+          { x: 35, y: 79, scale: 0.74, facing: 'left' },
+          { x: 25, y: 75, scale: 0.64, facing: 'left' },
+          { x: 17, y: 73, scale: 0.55, facing: 'left' }
         ]
       }
     ]
@@ -222,13 +222,15 @@ export const exploreLocations: ExploreLocation[] = [
             targetSubId: 'dining',
             label: 'Enter Grand Dining Hall',
             actionText: 'Step through arched doorway into dining room',
-            x: 52,
-            y: 56,
+            x: 36,
+            y: 52,
             direction: 'forward',
             walkWaypoints: [
-              { x: 50, y: 90, scale: 1.0, facing: 'away' },
-              { x: 51, y: 75, scale: 0.78, facing: 'away' },
-              { x: 52, y: 56, scale: 0.52, facing: 'away' }
+              { x: 45, y: 90, scale: 0.95, facing: 'away' },
+              { x: 43, y: 80, scale: 0.82, facing: 'left' },
+              { x: 40, y: 68, scale: 0.70, facing: 'left' },
+              { x: 37, y: 58, scale: 0.58, facing: 'away' },
+              { x: 36, y: 52, scale: 0.48, facing: 'away' }
             ]
           },
           {
@@ -236,13 +238,14 @@ export const exploreLocations: ExploreLocation[] = [
             targetLocationId: 'restaurant_exterior',
             label: 'Return to Exterior Deck',
             actionText: 'Walk back out to arrival deck',
-            x: 16,
-            y: 72,
+            x: 18,
+            y: 74,
             direction: 'back',
             walkWaypoints: [
-              { x: 45, y: 88, scale: 0.95, facing: 'left' },
-              { x: 30, y: 80, scale: 0.82, facing: 'left' },
-              { x: 16, y: 72, scale: 0.68, facing: 'towards' }
+              { x: 45, y: 90, scale: 0.95, facing: 'left' },
+              { x: 36, y: 84, scale: 0.84, facing: 'left' },
+              { x: 26, y: 78, scale: 0.74, facing: 'left' },
+              { x: 18, y: 74, scale: 0.65, facing: 'left' }
             ]
           }
         ]

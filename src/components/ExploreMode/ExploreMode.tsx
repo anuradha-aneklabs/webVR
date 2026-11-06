@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, MapPin, Compass, 
   Utensils, Waves, Bed, Trees, Activity, Home, ArrowUp, ArrowLeft, ArrowRight, ArrowDown,
@@ -37,7 +37,7 @@ const STATION_SPAWN_COORDS: Record<string, { x: number; y: number; scale: number
   entrance: { x: 50, y: 92, scale: 1.0, facing: 'away' },
   reception: { x: 22, y: 88, scale: 0.95, facing: 'away' },
   restaurant_exterior: { x: 58, y: 95, scale: 1.0, facing: 'away' },
-  restaurant_dining: { x: 50, y: 95, scale: 1.0, facing: 'away' },
+  restaurant_dining: { x: 45, y: 90, scale: 0.95, facing: 'away' },
   pool: { x: 8, y: 84, scale: 0.95, facing: 'away' },
   cottages: { x: 48, y: 94, scale: 1.0, facing: 'away' },
   garden: { x: 24, y: 95, scale: 1.0, facing: 'away' },
@@ -68,6 +68,116 @@ interface ActiveWalkState {
   currentScale: number;
   currentFacing: 'away' | 'left' | 'right' | 'towards';
   trailPoints: { x: number; y: number }[];
+}
+
+// Catmull-Rom spline interpolation for smooth organic curves along the resort roadways
+function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (
+    (2 * p1) +
+    (-p0 + p2) * t +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  );
+}
+
+function smoothWaypoints(pts: WalkWaypoint[], samplesPerSegment = 5): WalkWaypoint[] {
+  if (pts.length < 3) return pts;
+  const result: WalkWaypoint[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+
+    for (let j = (i === 0 ? 0 : 1); j <= samplesPerSegment; j++) {
+      const t = j / samplesPerSegment;
+      const x = catmullRom(p0.x, p1.x, p2.x, p3.x, t);
+      const y = catmullRom(p0.y, p1.y, p2.y, p3.y, t);
+      const s1 = p1.scale ?? 1.0;
+      const s2 = p2.scale ?? 0.5;
+      const scale = s1 + (s2 - s1) * t;
+      const facing = t < 0.5 ? (p1.facing || 'away') : (p2.facing || 'away');
+      result.push({
+        x: Number(x.toFixed(2)),
+        y: Number(y.toFixed(2)),
+        scale: Number(scale.toFixed(2)),
+        facing,
+      });
+    }
+  }
+  return result;
+}
+
+// Compute tapered perspective road ribbon polygon & guide paths from waypoints
+function computeRoadRibbon(
+  rawWaypoints: WalkWaypoint[],
+  baseWidth = 4.4
+): { polygonD: string; leftD: string; rightD: string; centerD: string; labelPoint: { x: number; y: number } } {
+  if (rawWaypoints.length < 2) {
+    const pt = rawWaypoints[0] || { x: 50, y: 50 };
+    return { polygonD: '', leftD: '', rightD: '', centerD: '', labelPoint: pt };
+  }
+
+  // Generate smooth curved spline along natural road trajectory
+  const waypoints = smoothWaypoints(rawWaypoints, 5);
+
+  const leftPts: { x: number; y: number }[] = [];
+  const rightPts: { x: number; y: number }[] = [];
+
+  for (let i = 0; i < waypoints.length; i++) {
+    const cur = waypoints[i];
+    // Perspective scale tapering: closer to camera (bottom) is wider, receding into distance is narrower
+    const s = cur.scale ?? Math.max(0.35, 1.0 - (i / (waypoints.length - 1)) * 0.55);
+    const halfWidth = (baseWidth * s) / 2;
+
+    let dx = 0;
+    let dy = 0;
+
+    if (i === 0) {
+      dx = waypoints[1].x - waypoints[0].x;
+      dy = waypoints[1].y - waypoints[0].y;
+    } else if (i === waypoints.length - 1) {
+      dx = waypoints[waypoints.length - 1].x - waypoints[waypoints.length - 2].x;
+      dy = waypoints[waypoints.length - 1].y - waypoints[waypoints.length - 2].y;
+    } else {
+      dx = waypoints[i + 1].x - waypoints[i - 1].x;
+      dy = waypoints[i + 1].y - waypoints[i - 1].y;
+    }
+
+    const len = Math.hypot(dx, dy);
+    if (len === 0) {
+      leftPts.push({ x: cur.x, y: cur.y });
+      rightPts.push({ x: cur.x, y: cur.y });
+      continue;
+    }
+
+    const nx = -dy / len;
+    const ny = dx / len;
+
+    leftPts.push({
+      x: Number((cur.x - nx * halfWidth).toFixed(2)),
+      y: Number((cur.y - ny * halfWidth).toFixed(2)),
+    });
+    rightPts.push({
+      x: Number((cur.x + nx * halfWidth).toFixed(2)),
+      y: Number((cur.y + ny * halfWidth).toFixed(2)),
+    });
+  }
+
+  const leftD = leftPts.reduce((acc, p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
+  const rightD = rightPts.reduce((acc, p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
+  const centerD = waypoints.reduce((acc, p, idx) => (idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
+
+  const reversedRight = [...rightPts].reverse();
+  const polygonD = `${leftD} L ${reversedRight.map((p) => `${p.x} ${p.y}`).join(' L ')} Z`;
+
+  // Place pathway label badge near ~45% distance along the curved path towards destination
+  const labelIdx = Math.min(waypoints.length - 1, Math.max(1, Math.floor(waypoints.length * 0.45)));
+  const labelPoint = waypoints[labelIdx];
+
+  return { polygonD, leftD, rightD, centerD, labelPoint };
 }
 
 export const ExploreMode: React.FC<ExploreModeProps> = ({
@@ -102,6 +212,12 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
     currentFacing: defaultSpawn.facing,
     trailPoints: [],
   });
+
+  // Track hovered hotspot/road for synchronized illumination
+  const [hoveredHotspotId, setHoveredHotspotId] = useState<string | null>(null);
+
+  // Entrance exploration started state: roads on Main Entrance are revealed only after clicking Start
+  const [isEntranceStarted, setIsEntranceStarted] = useState<boolean>(false);
 
   // Animation frame reference
   const animFrameRef = useRef<number | null>(null);
@@ -270,7 +386,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
     : null;
 
   // Fallback safe waypoints if a custom hotspot lacks coordinates
-  const getWaypointsForHotspot = (hs: Hotspot): WalkWaypoint[] => {
+  const getWaypointsForHotspot = useCallback((hs: Hotspot): WalkWaypoint[] => {
     if (hs.walkWaypoints && hs.walkWaypoints.length > 0) {
       return hs.walkWaypoints;
     }
@@ -282,7 +398,28 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       { x: midX, y: midY, scale: (spawn.scale + 0.5) / 2, facing: hs.direction === 'left' ? 'left' : 'away' },
       { x: hs.x, y: hs.y, scale: 0.5, facing: 'away' }
     ];
-  };
+  }, [currentLocationId]);
+
+  const currentSpawn = STATION_SPAWN_COORDS[currentLocationId] || STATION_SPAWN_COORDS.entrance;
+
+  // Pre-calculate visual road ribbons and guide paths for every available pathway from current position
+  const availableRoads = useMemo(() => {
+    return activeHotspots.map((hs) => {
+      const waypoints = getWaypointsForHotspot(hs);
+      const ribbon = computeRoadRibbon(waypoints, 4.4);
+      return {
+        hotspot: hs,
+        waypoints,
+        ...ribbon,
+      };
+    });
+  }, [activeHotspots, currentLocationId, getWaypointsForHotspot]);
+
+  // Origin point on the ground where roads diverge (aligns with spawn / waypoints)
+  const originPoint = availableRoads[0]?.waypoints[0] || currentSpawn;
+
+  // Only Main Entrance waits for Start button; all other locations display roads automatically upon arrival
+  const isRoadsVisible = currentLocationId !== 'entrance' || isEntranceStarted || walkState.isActive;
 
   // Start continuous walking character & glowing trail along the obstacle-avoiding pathway
   const startWalkingToHotspot = useCallback((hs: Hotspot) => {
@@ -291,9 +428,11 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       animFrameRef.current = null;
     }
 
+    setIsEntranceStarted(true);
     setLastArrivedStation(null);
 
-    const waypoints = getWaypointsForHotspot(hs);
+    const rawWaypoints = getWaypointsForHotspot(hs);
+    const waypoints = smoothWaypoints(rawWaypoints, 5);
     const startPt = waypoints[0];
 
     // Compute cumulative segment distances for smooth uniform-speed movement
@@ -401,7 +540,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
     };
 
     animFrameRef.current = requestAnimationFrame(animateWalk);
-  }, [currentLocationId, playFootstepSound]);
+  }, [currentLocationId, playFootstepSound, getWaypointsForHotspot]);
 
   // Instant location jump (from minimap or bottom bar tabs)
   const handleJumpLocation = (locId: string, subId?: string) => {
@@ -581,106 +720,299 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       </header>
 
       {/* 2. Main Photographic Viewport & Grounded Hotspots */}
-      <main className="relative flex-1 w-full overflow-hidden bg-black flex items-center justify-center">
-        {/* Realistic Photographic Scene with Cross-Fade Transition */}
-        <img
-          src={activeImage}
-          alt={activeTitle}
-          className={`w-full h-full object-cover select-none transition-all duration-400 ease-out ${
-            isCrossFading ? 'scale-105 opacity-60 blur-[2px]' : 'scale-100 opacity-100 blur-0'
-          }`}
-        />
+      <main className="relative flex-1 w-full overflow-hidden bg-[#070d0a] flex items-center justify-center p-0">
+        {/* Aspect-Locked Scenic Stage (1376x768 - 1.7916:1) - Eliminates coordinate drift across all screen sizes */}
+        <div 
+          className="relative max-w-full max-h-full aspect-[1376/768] overflow-hidden flex items-center justify-center select-none shadow-[0_0_80px_rgba(0,0,0,0.95)]"
+          style={{
+            width: 'min(100%, calc((100vh - 100px) * 1.7916))',
+            height: 'min(100%, calc(100vw / 1.7916))',
+          }}
+        >
+          {/* Realistic Photographic Scene with Cross-Fade Transition */}
+          <img
+            src={activeImage}
+            alt={activeTitle}
+            className={`w-full h-full object-fill select-none transition-all duration-400 ease-out ${
+              isCrossFading ? 'scale-105 opacity-60 blur-[2px]' : 'scale-100 opacity-100 blur-0'
+            }`}
+          />
 
         {/* Cinematic Vignette Overlays for Maximum Text Legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#070d0a]/90 via-transparent to-black/35 pointer-events-none" />
 
-        {/* 2A. SVG Glowing Neon Trail Line Overlay */}
-        {walkState.isActive && walkState.trailPoints.length > 1 && (
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none z-20"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <filter id="trail-neon-glow" x="-30%" y="-30%" width="160%" height="160%">
-                <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur1" />
-                <feGaussianBlur in="SourceGraphic" stdDeviation="3.0" result="blur2" />
-                <feMerge>
-                  <feMergeNode in="blur2" />
-                  <feMergeNode in="blur1" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
+        {/* CSS Keyframes for Directional Road Dash Flow and Pulse */}
+        <style>{`
+          @keyframes roadDashFlow {
+            from {
+              stroke-dashoffset: 24;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+          .animate-roadFlow {
+            animation: roadDashFlow 1.4s linear infinite;
+          }
+        `}</style>
 
-            {/* Wide Soft Ambient Emerald Aura */}
-            <path
-              d={trailSvgPath}
-              fill="none"
-              stroke="#28e070"
-              strokeWidth="4.2"
-              strokeOpacity="0.45"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#trail-neon-glow)"
-            />
+        {/* 2A. SVG Ground Roadways & Pathways Overlay for ALL Available Routes (Always Visible) */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none z-20"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+        >
+          <defs>
+            <filter id="trail-neon-glow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="blur1" />
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.0" result="blur2" />
+              <feMerge>
+                <feMergeNode in="blur2" />
+                <feMergeNode in="blur1" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
 
-            {/* Sharp Neon Green Trail Core */}
-            <path
-              d={trailSvgPath}
-              fill="none"
-              stroke="#34f480"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
+            {/* Default Paved Emerald Road Gradient */}
+            <linearGradient id="roadBedGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#28e070" stopOpacity="0.32" />
+              <stop offset="55%" stopColor="#10b981" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#059669" stopOpacity="0.14" />
+            </linearGradient>
 
-            {/* Glowing White Core Pulse Accent */}
-            <path
-              d={trailSvgPath}
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="0.8"
-              strokeDasharray="3 5"
-              strokeLinecap="round"
-              className="opacity-90"
-            />
+            {/* Hovered / Active Road Highlight Gradient */}
+            <linearGradient id="roadBedGradHover" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#34f480" stopOpacity="0.55" />
+              <stop offset="55%" stopColor="#28e070" stopOpacity="0.40" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.28" />
+            </linearGradient>
 
-            {/* Beacon Circle at Start Point */}
-            <circle
-              cx={walkState.trailPoints[0].x}
-              cy={walkState.trailPoints[0].y}
-              r="1.8"
-              fill="#28e070"
-              stroke="#ffffff"
-              strokeWidth="0.8"
-              className="animate-pulse"
-            />
+            {/* Recommended Target Route Gradient */}
+            <linearGradient id="roadBedGradRecommended" x1="0%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#34f480" stopOpacity="0.45" />
+              <stop offset="55%" stopColor="#10b981" stopOpacity="0.30" />
+              <stop offset="100%" stopColor="#047857" stopOpacity="0.18" />
+            </linearGradient>
+          </defs>
 
-            {/* Target Portal Ring at Destination */}
-            {walkState.targetHotspot && (
-              <g>
-                <circle
-                  cx={walkState.targetHotspot.x}
-                  cy={walkState.targetHotspot.y}
-                  r="3.5"
+          {/* Central Ground Origin Hub where all pathways branch from avatar's position */}
+          {isRoadsVisible && (
+            <g className="origin-hub">
+              <circle
+                cx={originPoint.x}
+                cy={originPoint.y}
+                r="3.2"
+                fill="none"
+                stroke="#28e070"
+                strokeWidth="0.8"
+                strokeOpacity="0.75"
+                className="animate-pulse"
+              />
+              <circle
+                cx={originPoint.x}
+                cy={originPoint.y}
+                r="1.6"
+                fill="#28e070"
+                fillOpacity="0.45"
+              />
+            </g>
+          )}
+
+          {/* Render Ground Road Ribbon & Guide Lines for EACH Available Route */}
+          {isRoadsVisible && availableRoads.map((road) => {
+            const isHovered = hoveredHotspotId === road.hotspot.id;
+            const isRecommended = nextRouteHotspot?.id === road.hotspot.id;
+            const isWalkActive = walkState.isActive;
+            const isWalkTarget = walkState.targetHotspot?.id === road.hotspot.id;
+
+            // When walking along another path, softly dim unselected paths
+            const opacityClass = isWalkActive
+              ? isWalkTarget
+                ? 'opacity-100'
+                : 'opacity-25 transition-opacity duration-300'
+              : 'opacity-100 transition-opacity duration-300';
+
+            return (
+              <g 
+                key={`road-group-${road.hotspot.id}`} 
+                data-testid={`road-${road.hotspot.id}`}
+                className={opacityClass}
+              >
+                {/* 1. Tapered Paved Road Bed Polygon (Clickable to walk) */}
+                <path
+                  d={road.polygonD}
+                  fill={isWalkTarget || isHovered ? 'url(#roadBedGradHover)' : isRecommended ? 'url(#roadBedGradRecommended)' : 'url(#roadBedGrad)'}
+                  stroke={isWalkTarget || isHovered ? '#34f480' : isRecommended ? '#34f480' : '#28e070'}
+                  strokeWidth={isHovered ? '0.7' : '0.4'}
+                  strokeOpacity={isHovered ? '0.9' : '0.45'}
+                  className="pointer-events-auto cursor-pointer transition-colors duration-200"
+                  onClick={() => !walkState.isActive && handleHotspotClick(road.hotspot)}
+                  onMouseEnter={() => setHoveredHotspotId(road.hotspot.id)}
+                  onMouseLeave={() => setHoveredHotspotId(null)}
+                />
+
+                {/* 2. Left Illuminated Road Curb */}
+                <path
+                  d={road.leftD}
                   fill="none"
-                  stroke="#34f480"
-                  strokeWidth="1.2"
-                  strokeDasharray="2 2"
-                  className="animate-spin"
-                  style={{ transformOrigin: `${walkState.targetHotspot.x}% ${walkState.targetHotspot.y}%` }}
+                  stroke={isHovered ? '#ffffff' : '#34f480'}
+                  strokeWidth={isHovered ? '1.0' : '0.7'}
+                  strokeOpacity={isHovered ? '0.95' : '0.65'}
+                  strokeDasharray="2 3"
+                  className="pointer-events-none"
                 />
-                <circle
-                  cx={walkState.targetHotspot.x}
-                  cy={walkState.targetHotspot.y}
-                  r="1.5"
-                  fill="#34f480"
+
+                {/* 3. Right Illuminated Road Curb */}
+                <path
+                  d={road.rightD}
+                  fill="none"
+                  stroke={isHovered ? '#ffffff' : '#34f480'}
+                  strokeWidth={isHovered ? '1.0' : '0.7'}
+                  strokeOpacity={isHovered ? '0.95' : '0.65'}
+                  strokeDasharray="2 3"
+                  className="pointer-events-none"
                 />
+
+                {/* 4. Wide Soft Emerald Ambient Center Glow */}
+                <path
+                  d={road.centerD}
+                  fill="none"
+                  stroke="#28e070"
+                  strokeWidth={isHovered ? '4.8' : '3.6'}
+                  strokeOpacity={isHovered ? '0.6' : '0.35'}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  filter="url(#trail-neon-glow)"
+                  className="pointer-events-none"
+                />
+
+                {/* 5. Sharp Neon Green Pathway Guide Core */}
+                <path
+                  d={road.centerD}
+                  fill="none"
+                  stroke={isHovered || isRecommended ? '#34f480' : '#28e070'}
+                  strokeWidth={isHovered ? '2.4' : '1.8'}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="pointer-events-none"
+                />
+
+                {/* 6. Directional Animated Dash Flow towards Destination */}
+                <path
+                  d={road.centerD}
+                  fill="none"
+                  stroke="#ffffff"
+                  strokeWidth="1.0"
+                  strokeDasharray="2.5 5"
+                  strokeLinecap="round"
+                  strokeOpacity={isHovered ? '1.0' : '0.85'}
+                  className="animate-roadFlow pointer-events-none"
+                />
+
+                {/* 7. Destination Target Portal Ring on Ground at Hotspot */}
+                <g className="pointer-events-none">
+                  <circle
+                    cx={road.hotspot.x}
+                    cy={road.hotspot.y}
+                    r={isHovered ? '3.8' : '3.0'}
+                    fill="none"
+                    stroke="#34f480"
+                    strokeWidth={isHovered ? '1.4' : '1.0'}
+                    strokeDasharray="2 2"
+                    className="animate-spin"
+                    style={{ transformOrigin: `${road.hotspot.x}% ${road.hotspot.y}%` }}
+                  />
+                  <circle
+                    cx={road.hotspot.x}
+                    cy={road.hotspot.y}
+                    r="1.4"
+                    fill="#34f480"
+                    fillOpacity="0.8"
+                  />
+                </g>
               </g>
-            )}
-          </svg>
-        )}
+            );
+          })}
+
+          {/* Dynamic Walking Trail Line (traveled distance during active walking) */}
+          {walkState.isActive && walkState.trailPoints.length > 1 && (
+            <g className="active-walking-trail">
+              {/* Extra Vivid Traveling Aura */}
+              <path
+                d={trailSvgPath}
+                fill="none"
+                stroke="#28e070"
+                strokeWidth="5.5"
+                strokeOpacity="0.65"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#trail-neon-glow)"
+              />
+              <path
+                d={trailSvgPath}
+                fill="none"
+                stroke="#34f480"
+                strokeWidth="2.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d={trailSvgPath}
+                fill="none"
+                stroke="#ffffff"
+                strokeWidth="1.2"
+                strokeDasharray="2 4"
+                strokeLinecap="round"
+              />
+              <circle
+                cx={walkState.trailPoints[0].x}
+                cy={walkState.trailPoints[0].y}
+                r="2.2"
+                fill="#28e070"
+                stroke="#ffffff"
+                strokeWidth="1.0"
+                className="animate-pulse"
+              />
+            </g>
+          )}
+        </svg>
+
+        {/* 2A-2. Floating Road Indicator Badges along each pathway */}
+        {isRoadsVisible && availableRoads.map((road) => {
+          const isHovered = hoveredHotspotId === road.hotspot.id;
+          const isRecommended = nextRouteHotspot?.id === road.hotspot.id;
+          const isWalkActive = walkState.isActive;
+          const isWalkTarget = walkState.targetHotspot?.id === road.hotspot.id;
+
+          if (isWalkActive && !isWalkTarget) return null;
+
+          return (
+            <div
+              key={`road-label-${road.hotspot.id}`}
+              onClick={() => !walkState.isActive && handleHotspotClick(road.hotspot)}
+              onMouseEnter={() => setHoveredHotspotId(road.hotspot.id)}
+              onMouseLeave={() => setHoveredHotspotId(null)}
+              style={{ left: `${road.labelPoint.x}%`, top: `${road.labelPoint.y}%` }}
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-20 cursor-pointer pointer-events-auto transition-all duration-300 ${
+                isWalkActive && isWalkTarget ? 'scale-110' : ''
+              }`}
+            >
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full backdrop-blur-md text-[10px] font-bold transition-all shadow-xl border ${
+                  isWalkTarget || isHovered || isRecommended
+                    ? 'bg-[#122e1c]/95 text-[#34f480] border-[#34f480] shadow-[0_0_18px_rgba(52,244,128,0.45)] scale-105'
+                    : 'bg-black/80 text-gray-200 border-white/20 hover:border-[#34f480] hover:text-[#34f480]'
+                }`}
+              >
+                <Footprints className="w-3 h-3 text-[#34f480] flex-shrink-0 animate-pulse" />
+                <span className="truncate max-w-[130px]">{road.hotspot.label.split('&')[0].trim()}</span>
+                {isRecommended && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#34f480] animate-ping" />
+                )}
+              </div>
+            </div>
+          );
+        })}
 
         {/* 2B. Walking Character Avatar (Station Spawn Point when idle, moving along path when active) */}
         <WalkingCharacter
@@ -692,9 +1024,10 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
         />
 
         {/* 2C. Clickable Directional Hotspot Arrows (Hidden during active walking) */}
-        {!walkState.isActive && activeHotspots.map((hs) => {
+        {!walkState.isActive && isRoadsVisible && activeHotspots.map((hs) => {
           const DirIcon = directionIcons[hs.direction || 'forward'];
           const previewImg = getHotspotPreviewImage(hs);
+          const isHovered = hoveredHotspotId === hs.id;
 
           return (
             <div
@@ -704,12 +1037,18 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
               data-target-sub={hs.targetSubId || ''}
               data-label={hs.label}
               onClick={() => handleHotspotClick(hs)}
+              onMouseEnter={() => setHoveredHotspotId(hs.id)}
+              onMouseLeave={() => setHoveredHotspotId(null)}
               style={{ left: `${hs.x}%`, top: `${hs.y}%` }}
-              className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
+              className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer transition-transform duration-200 ${
+                isHovered ? 'scale-115' : ''
+              }`}
             >
               <div className="relative flex items-center justify-center">
                 <div className="w-12 h-12 rounded-full bg-[#28e070]/30 pulse-circle absolute" />
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#28e070] text-black flex items-center justify-center shadow-[0_0_20px_#28e070] group-hover:scale-115 transition-transform border-2 border-white">
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#28e070] text-black flex items-center justify-center transition-transform border-2 border-white ${
+                  isHovered ? 'shadow-[0_0_25px_#34f480] scale-110' : 'shadow-[0_0_20px_#28e070] group-hover:scale-115'
+                }`}>
                   <DirIcon className="w-4 h-4 stroke-[3]" />
                 </div>
               </div>
@@ -734,7 +1073,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                     </span>
                     <span className="text-[9px] text-[#34f480] font-semibold mt-0.5 flex items-center gap-1">
                       <Footprints className="w-2.5 h-2.5" />
-                      <span>Click arrow to walk</span>
+                      <span>Click to walk along path</span>
                     </span>
                   </div>
                 </div>
@@ -742,6 +1081,27 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
             </div>
           );
         })}
+
+        {/* Start Exploration CTA: ONLY on Main Entrance before clicking Start */}
+        {currentLocationId === 'entrance' && !isEntranceStarted && !walkState.isActive && (
+          <div 
+            style={{ left: '50%', top: '78%' }}
+            className="absolute transform -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1.5 animate-fadeIn pointer-events-auto select-none"
+          >
+            <button
+              onClick={() => setIsEntranceStarted(true)}
+              className="px-6 py-2.5 rounded-full bg-[#28e070] hover:bg-[#34f480] text-black font-extrabold text-xs sm:text-sm flex items-center gap-2 shadow-[0_0_25px_#28e070] hover:scale-105 active:scale-95 transition-all cursor-pointer border-2 border-white"
+            >
+              <Sparkles className="w-4 h-4 fill-black animate-pulse" />
+              <span>Start Exploration</span>
+              <ArrowUp className="w-4 h-4 stroke-[3]" />
+            </button>
+            <span className="text-[10px] text-white/90 font-semibold px-2.5 py-0.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 shadow-md">
+              Click to reveal resort pathways
+            </span>
+          </div>
+        )}
+        </div>
 
         {/* 2D. Compact Right-Side Destination Panel (Does not obstruct path or character) */}
         <div 
@@ -816,6 +1176,8 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                   <button
                     disabled={walkState.isActive}
                     onClick={() => startWalkingToHotspot(nextRouteHotspot)}
+                    onMouseEnter={() => setHoveredHotspotId(nextRouteHotspot.id)}
+                    onMouseLeave={() => setHoveredHotspotId(null)}
                     className="w-full py-1.5 px-2.5 rounded-lg bg-[#28e070] hover:bg-[#34f480] text-black font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow-md shadow-[#28e070]/25 transition-all cursor-pointer disabled:opacity-50"
                   >
                     <Footprints className="w-3.5 h-3.5" />
@@ -832,12 +1194,19 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                 <div className="flex flex-col gap-1 max-h-[130px] overflow-y-auto pr-0.5">
                   {activeHotspots.map((hs) => {
                     const HsDirIcon = directionIcons[hs.direction || 'forward'];
+                    const isHovered = hoveredHotspotId === hs.id;
                     return (
                       <button
                         key={hs.id}
                         disabled={walkState.isActive}
                         onClick={() => startWalkingToHotspot(hs)}
-                        className="w-full flex items-center justify-between px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white hover:text-[#34f480] transition-colors border border-white/10 cursor-pointer disabled:opacity-50 text-[11px] group text-left"
+                        onMouseEnter={() => setHoveredHotspotId(hs.id)}
+                        onMouseLeave={() => setHoveredHotspotId(null)}
+                        className={`w-full flex items-center justify-between px-2 py-1 rounded-lg transition-colors border cursor-pointer disabled:opacity-50 text-[11px] group text-left ${
+                          isHovered
+                            ? 'bg-[#1b4328] text-[#34f480] border-[#34f480] shadow-sm'
+                            : 'bg-white/5 hover:bg-white/15 text-white hover:text-[#34f480] border-white/10'
+                        }`}
                       >
                         <div className="flex items-center gap-1.5 truncate min-w-0 pr-1">
                           <HsDirIcon className="w-3 h-3 text-[#34f480] flex-shrink-0" />
