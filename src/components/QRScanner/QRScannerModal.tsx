@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, CheckCircle2, AlertCircle, RefreshCw, MapPin, QrCode, Navigation, Compass, Upload, ExternalLink } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, RefreshCw, MapPin, QrCode, Navigation, Compass, Upload, ExternalLink, Footprints } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { allQRCodes, graphNodes } from '../../data/navigationGraph';
 import { parkLocations } from '../../data/parkLocations';
@@ -10,6 +10,7 @@ interface QRScannerModalProps {
   onLocationDetected: (locationId: string) => void;
   onStartRouteTo?: (destinationId: string) => void;
   selectedDestinationId?: string;
+  onOpenExploreAt?: (locationId: string) => void;
 }
 
 export const QRScannerModal: React.FC<QRScannerModalProps> = ({
@@ -17,6 +18,7 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
   onClose,
   onLocationDetected,
   onStartRouteTo,
+  onOpenExploreAt,
   selectedDestinationId = 'restaurant'
 }) => {
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -250,6 +252,21 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({
                   <Compass className="w-3.5 h-3.5" />
                   <span>Calculate Real Route &amp; Start Navigation</span>
                 </button>
+
+                {onOpenExploreAt && (
+                  <button
+                    onClick={() => {
+                      if (detectedLocation) {
+                        onOpenExploreAt(detectedLocation);
+                        onClose();
+                      }
+                    }}
+                    className="w-full bg-[#163622] hover:bg-[#28e070] text-[#34f480] hover:text-black font-extrabold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 border border-[#34f480]/50 shadow transition-all cursor-pointer"
+                  >
+                    <Footprints className="w-3.5 h-3.5" />
+                    <span>Walk Here in Explore Mode</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

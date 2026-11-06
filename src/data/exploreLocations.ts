@@ -54,16 +54,17 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-ent-rec',
         targetLocationId: 'reception',
         label: 'Welcome Reception & Lounge',
-        actionText: 'Proceed forward through arrival portal to Reception',
-        x: 50,
-        y: 65,
+        actionText: 'Follow paved driveway through archway to Reception',
+        x: 43,
+        y: 58,
         direction: 'forward',
         walkWaypoints: [
           { x: 50, y: 92, scale: 1.0, facing: 'away' },
-          { x: 50, y: 82, scale: 0.85, facing: 'away' },
-          { x: 50, y: 72, scale: 0.70, facing: 'away' },
-          { x: 50, y: 64, scale: 0.55, facing: 'away' },
-          { x: 50, y: 56, scale: 0.42, facing: 'away' }
+          { x: 49, y: 82, scale: 0.85, facing: 'away' },
+          { x: 50, y: 74, scale: 0.72, facing: 'away' },
+          { x: 51, y: 68, scale: 0.60, facing: 'away' },
+          { x: 47, y: 63, scale: 0.50, facing: 'left' },
+          { x: 43, y: 58, scale: 0.42, facing: 'away' }
         ]
       },
       {
@@ -72,13 +73,14 @@ export const exploreLocations: ExploreLocation[] = [
         label: 'Forest Chalets Walkway',
         actionText: 'Follow left stone path to Forest Cottages',
         x: 20,
-        y: 72,
+        y: 66,
         direction: 'left',
         walkWaypoints: [
-          { x: 48, y: 90, scale: 1.0, facing: 'left' },
-          { x: 38, y: 82, scale: 0.82, facing: 'left' },
-          { x: 28, y: 76, scale: 0.68, facing: 'left' },
-          { x: 20, y: 72, scale: 0.55, facing: 'left' }
+          { x: 50, y: 92, scale: 1.0, facing: 'away' },
+          { x: 46, y: 84, scale: 0.86, facing: 'left' },
+          { x: 38, y: 76, scale: 0.72, facing: 'left' },
+          { x: 28, y: 70, scale: 0.60, facing: 'left' },
+          { x: 20, y: 66, scale: 0.48, facing: 'left' }
         ]
       }
     ]
@@ -97,44 +99,45 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-rec-res',
         targetLocationId: 'restaurant_exterior',
         label: 'The Forest Pavilion Restaurant',
-        actionText: 'Walk out garden doors to Restaurant Pavilion',
-        x: 70,
-        y: 60,
+        actionText: 'Walk along stone-tile aisle to Restaurant Pavilion',
+        x: 52,
+        y: 57,
         direction: 'right',
         walkWaypoints: [
-          { x: 48, y: 88, scale: 1.0, facing: 'right' },
-          { x: 56, y: 78, scale: 0.82, facing: 'right' },
-          { x: 64, y: 68, scale: 0.68, facing: 'right' },
-          { x: 70, y: 60, scale: 0.52, facing: 'away' }
+          { x: 22, y: 88, scale: 0.95, facing: 'away' },
+          { x: 24, y: 78, scale: 0.82, facing: 'away' },
+          { x: 34, y: 68, scale: 0.70, facing: 'right' },
+          { x: 44, y: 62, scale: 0.60, facing: 'right' },
+          { x: 52, y: 57, scale: 0.50, facing: 'away' }
         ]
       },
       {
         id: 'h-rec-pool',
         targetLocationId: 'pool',
         label: 'Crystal Swimming Pool',
-        actionText: 'Follow terrace corridor to the Swimming Pool',
-        x: 30,
-        y: 62,
+        actionText: 'Follow terrace tile corridor to the Swimming Pool',
+        x: 14,
+        y: 64,
         direction: 'left',
         walkWaypoints: [
-          { x: 48, y: 88, scale: 1.0, facing: 'left' },
-          { x: 40, y: 78, scale: 0.82, facing: 'left' },
-          { x: 34, y: 70, scale: 0.68, facing: 'left' },
-          { x: 30, y: 62, scale: 0.55, facing: 'away' }
+          { x: 22, y: 88, scale: 0.95, facing: 'away' },
+          { x: 20, y: 78, scale: 0.82, facing: 'left' },
+          { x: 18, y: 70, scale: 0.70, facing: 'left' },
+          { x: 14, y: 64, scale: 0.58, facing: 'away' }
         ]
       },
       {
         id: 'h-rec-ent',
         targetLocationId: 'entrance',
         label: 'Main Entrance Gate',
-        actionText: 'Return to Main Arrival Gate',
-        x: 12,
-        y: 75,
+        actionText: 'Return along walkway to Main Arrival Gate',
+        x: 18,
+        y: 88,
         direction: 'back',
         walkWaypoints: [
-          { x: 40, y: 86, scale: 0.95, facing: 'left' },
-          { x: 26, y: 80, scale: 0.82, facing: 'left' },
-          { x: 14, y: 75, scale: 0.70, facing: 'towards' }
+          { x: 22, y: 88, scale: 0.95, facing: 'towards' },
+          { x: 20, y: 92, scale: 1.0, facing: 'towards' },
+          { x: 18, y: 98, scale: 1.08, facing: 'towards' }
         ]
       }
     ]
@@ -155,43 +158,43 @@ export const exploreLocations: ExploreLocation[] = [
         targetSubId: 'foyer',
         label: 'Wine Foyer & Host Entrance',
         actionText: 'Step inside through the glass entrance doors',
-        x: 50,
-        y: 56,
+        x: 66,
+        y: 68,
         direction: 'forward',
         walkWaypoints: [
-          { x: 50, y: 90, scale: 1.0, facing: 'away' },
-          { x: 50, y: 78, scale: 0.80, facing: 'away' },
-          { x: 50, y: 66, scale: 0.64, facing: 'away' },
-          { x: 50, y: 56, scale: 0.48, facing: 'away' }
+          { x: 58, y: 95, scale: 1.0, facing: 'away' },
+          { x: 60, y: 84, scale: 0.85, facing: 'away' },
+          { x: 65, y: 76, scale: 0.70, facing: 'away' },
+          { x: 66, y: 68, scale: 0.52, facing: 'away' }
         ]
       },
       {
         id: 'h-rext-pool',
         targetLocationId: 'pool',
         label: 'Swimming Pool Deck',
-        actionText: 'Follow wooden walkway to the Pool',
-        x: 84,
-        y: 68,
+        actionText: 'Follow outdoor boardwalk around pavilion to the Pool',
+        x: 80,
+        y: 65,
         direction: 'right',
         walkWaypoints: [
-          { x: 52, y: 88, scale: 1.0, facing: 'right' },
-          { x: 66, y: 80, scale: 0.82, facing: 'right' },
-          { x: 76, y: 74, scale: 0.68, facing: 'right' },
-          { x: 84, y: 68, scale: 0.55, facing: 'away' }
+          { x: 58, y: 95, scale: 1.0, facing: 'away' },
+          { x: 62, y: 84, scale: 0.85, facing: 'right' },
+          { x: 70, y: 78, scale: 0.72, facing: 'right' },
+          { x: 76, y: 72, scale: 0.62, facing: 'away' },
+          { x: 80, y: 65, scale: 0.52, facing: 'away' }
         ]
       },
       {
         id: 'h-rext-rec',
         targetLocationId: 'reception',
         label: 'Welcome Reception',
-        actionText: 'Return to Welcome Reception Lounge',
-        x: 15,
-        y: 72,
+        actionText: 'Return along wooden bridge to Welcome Reception',
+        x: 54,
+        y: 98,
         direction: 'back',
         walkWaypoints: [
-          { x: 46, y: 88, scale: 1.0, facing: 'left' },
-          { x: 30, y: 80, scale: 0.82, facing: 'left' },
-          { x: 15, y: 72, scale: 0.65, facing: 'towards' }
+          { x: 58, y: 95, scale: 1.0, facing: 'towards' },
+          { x: 56, y: 98, scale: 1.08, facing: 'towards' }
         ]
       }
     ]
@@ -453,44 +456,50 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-pool-cot',
         targetLocationId: 'cottages',
         label: 'Forest Cottages & Chalets',
-        actionText: 'Take left stone pathway to Forest Cottages',
-        x: 24,
-        y: 60,
+        actionText: 'Follow left teak deck walkway to Forest Cottages',
+        x: 22,
+        y: 56,
         direction: 'left',
         walkWaypoints: [
-          { x: 28, y: 86, scale: 0.95, facing: 'left' },
-          { x: 26, y: 76, scale: 0.80, facing: 'left' },
-          { x: 24, y: 66, scale: 0.65, facing: 'left' },
-          { x: 24, y: 60, scale: 0.52, facing: 'away' }
+          { x: 8, y: 84, scale: 0.95, facing: 'away' },
+          { x: 12, y: 74, scale: 0.80, facing: 'away' },
+          { x: 16, y: 64, scale: 0.66, facing: 'left' },
+          { x: 22, y: 56, scale: 0.52, facing: 'away' }
         ]
       },
       {
         id: 'h-pool-spa',
         targetLocationId: 'spa',
         label: 'The Lotus Spa & Wellness',
-        actionText: 'Follow palm-lined path to the Spa',
-        x: 78,
+        actionText: 'Follow left deck and rear promenade to the Spa',
+        x: 70,
         y: 58,
         direction: 'right',
         walkWaypoints: [
-          { x: 66, y: 84, scale: 0.95, facing: 'right' },
-          { x: 70, y: 74, scale: 0.80, facing: 'right' },
-          { x: 74, y: 66, scale: 0.66, facing: 'right' },
-          { x: 78, y: 58, scale: 0.52, facing: 'away' }
+          { x: 8, y: 84, scale: 0.95, facing: 'away' },
+          { x: 12, y: 74, scale: 0.80, facing: 'away' },
+          { x: 18, y: 64, scale: 0.66, facing: 'right' },
+          { x: 30, y: 56, scale: 0.56, facing: 'right' },
+          { x: 48, y: 52, scale: 0.50, facing: 'right' },
+          { x: 62, y: 54, scale: 0.48, facing: 'right' },
+          { x: 70, y: 58, scale: 0.46, facing: 'away' }
         ]
       },
       {
         id: 'h-pool-res',
         targetLocationId: 'restaurant_exterior',
         label: 'Restaurant Pavilion',
-        actionText: 'Return to Restaurant Pavilion',
-        x: 50,
-        y: 45,
+        actionText: 'Follow teak deck around pool to Restaurant Pavilion',
+        x: 62,
+        y: 52,
         direction: 'back',
         walkWaypoints: [
-          { x: 64, y: 80, scale: 0.90, facing: 'away' },
-          { x: 58, y: 62, scale: 0.70, facing: 'away' },
-          { x: 50, y: 45, scale: 0.45, facing: 'away' }
+          { x: 8, y: 84, scale: 0.95, facing: 'away' },
+          { x: 12, y: 74, scale: 0.80, facing: 'away' },
+          { x: 18, y: 64, scale: 0.66, facing: 'right' },
+          { x: 32, y: 56, scale: 0.56, facing: 'right' },
+          { x: 48, y: 52, scale: 0.50, facing: 'right' },
+          { x: 62, y: 52, scale: 0.46, facing: 'away' }
         ]
       }
     ]
@@ -517,30 +526,33 @@ export const exploreLocations: ExploreLocation[] = [
             targetLocationId: 'cottages',
             targetSubId: 'interior',
             label: 'Bedroom Suite Interior',
-            actionText: 'Step inside the bedroom suite',
-            x: 52,
+            actionText: 'Step up porch stairs into the bedroom suite',
+            x: 37,
             y: 58,
             direction: 'forward',
             walkWaypoints: [
-              { x: 50, y: 90, scale: 1.0, facing: 'away' },
-              { x: 51, y: 76, scale: 0.80, facing: 'away' },
-              { x: 52, y: 68, scale: 0.66, facing: 'away' },
-              { x: 52, y: 58, scale: 0.52, facing: 'away' }
+              { x: 48, y: 94, scale: 1.0, facing: 'away' },
+              { x: 42, y: 86, scale: 0.84, facing: 'left' },
+              { x: 36, y: 78, scale: 0.72, facing: 'left' },
+              { x: 33, y: 70, scale: 0.62, facing: 'away' },
+              { x: 35, y: 64, scale: 0.55, facing: 'away' },
+              { x: 37, y: 58, scale: 0.48, facing: 'away' }
             ]
           },
           {
             id: 'h-cot-gar',
             targetLocationId: 'garden',
             label: 'Botanical Garden',
-            actionText: 'Stroll along stone path to Botanical Garden',
-            x: 84,
+            actionText: 'Follow stone path around garden to Botanical Garden',
+            x: 52,
             y: 68,
             direction: 'right',
             walkWaypoints: [
-              { x: 50, y: 88, scale: 1.0, facing: 'right' },
-              { x: 64, y: 80, scale: 0.82, facing: 'right' },
-              { x: 76, y: 74, scale: 0.68, facing: 'right' },
-              { x: 84, y: 68, scale: 0.55, facing: 'away' }
+              { x: 48, y: 94, scale: 1.0, facing: 'away' },
+              { x: 42, y: 86, scale: 0.84, facing: 'left' },
+              { x: 36, y: 78, scale: 0.72, facing: 'right' },
+              { x: 44, y: 72, scale: 0.62, facing: 'right' },
+              { x: 52, y: 68, scale: 0.52, facing: 'away' }
             ]
           }
         ]
@@ -575,29 +587,29 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-cot-gar-main',
         targetLocationId: 'garden',
         label: 'Botanical Garden',
-        actionText: 'Stroll along stone path to Botanical Garden',
-        x: 84,
+        actionText: 'Follow stone path around garden to Botanical Garden',
+        x: 52,
         y: 68,
         direction: 'right',
         walkWaypoints: [
-          { x: 50, y: 88, scale: 1.0, facing: 'right' },
-          { x: 64, y: 80, scale: 0.82, facing: 'right' },
-          { x: 76, y: 74, scale: 0.68, facing: 'right' },
-          { x: 84, y: 68, scale: 0.55, facing: 'away' }
+          { x: 48, y: 94, scale: 1.0, facing: 'away' },
+          { x: 42, y: 86, scale: 0.84, facing: 'left' },
+          { x: 36, y: 78, scale: 0.72, facing: 'right' },
+          { x: 44, y: 72, scale: 0.62, facing: 'right' },
+          { x: 52, y: 68, scale: 0.52, facing: 'away' }
         ]
       },
       {
         id: 'h-cot-pool',
         targetLocationId: 'pool',
         label: 'Swimming Pool',
-        actionText: 'Head back to the Swimming Pool',
-        x: 18,
-        y: 72,
+        actionText: 'Follow flagstones back to the Swimming Pool',
+        x: 54,
+        y: 98,
         direction: 'back',
         walkWaypoints: [
-          { x: 44, y: 88, scale: 0.95, facing: 'left' },
-          { x: 30, y: 80, scale: 0.80, facing: 'left' },
-          { x: 18, y: 72, scale: 0.65, facing: 'towards' }
+          { x: 48, y: 94, scale: 1.0, facing: 'towards' },
+          { x: 50, y: 98, scale: 1.08, facing: 'towards' }
         ]
       }
     ]
@@ -616,43 +628,44 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-gar-adv',
         targetLocationId: 'adventure',
         label: 'Canopy Adventure Zone',
-        actionText: 'Hike cobblestone path to Adventure Zone',
-        x: 76,
-        y: 56,
+        actionText: 'Follow curved cobblestones past gazebo to Adventure Zone',
+        x: 48,
+        y: 59,
         direction: 'forward',
         walkWaypoints: [
-          { x: 48, y: 90, scale: 1.0, facing: 'right' },
-          { x: 58, y: 78, scale: 0.80, facing: 'right' },
-          { x: 68, y: 66, scale: 0.65, facing: 'away' },
-          { x: 76, y: 56, scale: 0.50, facing: 'away' }
+          { x: 24, y: 95, scale: 1.0, facing: 'away' },
+          { x: 26, y: 82, scale: 0.82, facing: 'away' },
+          { x: 30, y: 72, scale: 0.70, facing: 'right' },
+          { x: 38, y: 64, scale: 0.60, facing: 'right' },
+          { x: 48, y: 59, scale: 0.50, facing: 'away' }
         ]
       },
       {
         id: 'h-gar-pool',
         targetLocationId: 'pool',
         label: 'Swimming Pool',
-        actionText: 'Follow side path toward the Pool',
-        x: 22,
-        y: 62,
+        actionText: 'Follow side garden path toward the Pool',
+        x: 14,
+        y: 65,
         direction: 'left',
         walkWaypoints: [
-          { x: 46, y: 88, scale: 1.0, facing: 'left' },
-          { x: 34, y: 76, scale: 0.80, facing: 'left' },
-          { x: 22, y: 62, scale: 0.55, facing: 'away' }
+          { x: 24, y: 95, scale: 1.0, facing: 'away' },
+          { x: 22, y: 84, scale: 0.82, facing: 'left' },
+          { x: 18, y: 74, scale: 0.68, facing: 'left' },
+          { x: 14, y: 65, scale: 0.55, facing: 'away' }
         ]
       },
       {
         id: 'h-gar-cot',
         targetLocationId: 'cottages',
         label: 'Forest Cottages & Chalets',
-        actionText: 'Stroll back along stone path to Cottages',
-        x: 15,
-        y: 72,
+        actionText: 'Follow cobblestones back toward Cottages',
+        x: 22,
+        y: 94,
         direction: 'back',
         walkWaypoints: [
-          { x: 44, y: 88, scale: 0.95, facing: 'left' },
-          { x: 28, y: 80, scale: 0.80, facing: 'left' },
-          { x: 15, y: 72, scale: 0.65, facing: 'towards' }
+          { x: 24, y: 95, scale: 1.0, facing: 'towards' },
+          { x: 22, y: 98, scale: 1.08, facing: 'towards' }
         ]
       }
     ]
@@ -671,28 +684,28 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-adv-spa',
         targetLocationId: 'spa',
         label: 'The Lotus Spa & Wellness',
-        actionText: 'Follow descending trail to the Spa',
-        x: 62,
-        y: 68,
+        actionText: 'Follow descending timber boardwalk to the Spa',
+        x: 50,
+        y: 72,
         direction: 'right',
         walkWaypoints: [
-          { x: 50, y: 90, scale: 1.0, facing: 'right' },
-          { x: 56, y: 80, scale: 0.80, facing: 'right' },
-          { x: 62, y: 68, scale: 0.60, facing: 'away' }
+          { x: 12, y: 88, scale: 0.95, facing: 'away' },
+          { x: 24, y: 74, scale: 0.80, facing: 'right' },
+          { x: 38, y: 70, scale: 0.68, facing: 'right' },
+          { x: 50, y: 72, scale: 0.58, facing: 'away' }
         ]
       },
       {
         id: 'h-adv-gar',
         targetLocationId: 'garden',
         label: 'Botanical Garden',
-        actionText: 'Return to Botanical Garden Gazebo',
-        x: 20,
-        y: 68,
+        actionText: 'Return along walkway to Botanical Garden Gazebo',
+        x: 8,
+        y: 92,
         direction: 'back',
         walkWaypoints: [
-          { x: 46, y: 88, scale: 0.95, facing: 'left' },
-          { x: 32, y: 78, scale: 0.80, facing: 'left' },
-          { x: 20, y: 68, scale: 0.65, facing: 'towards' }
+          { x: 12, y: 88, scale: 0.95, facing: 'towards' },
+          { x: 10, y: 94, scale: 1.05, facing: 'towards' }
         ]
       }
     ]
@@ -711,28 +724,28 @@ export const exploreLocations: ExploreLocation[] = [
         id: 'h-spa-pool',
         targetLocationId: 'pool',
         label: 'Swimming Pool Deck',
-        actionText: 'Stroll garden door to Swimming Pool',
-        x: 76,
-        y: 60,
+        actionText: 'Walk along side floor corridor out to Swimming Pool',
+        x: 26,
+        y: 58,
         direction: 'right',
         walkWaypoints: [
-          { x: 50, y: 88, scale: 1.0, facing: 'right' },
-          { x: 64, y: 76, scale: 0.80, facing: 'right' },
-          { x: 76, y: 60, scale: 0.55, facing: 'away' }
+          { x: 16, y: 92, scale: 0.95, facing: 'away' },
+          { x: 18, y: 82, scale: 0.80, facing: 'away' },
+          { x: 22, y: 70, scale: 0.65, facing: 'away' },
+          { x: 26, y: 58, scale: 0.50, facing: 'away' }
         ]
       },
       {
         id: 'h-spa-rec',
         targetLocationId: 'reception',
         label: 'Welcome Reception Lounge',
-        actionText: 'Follow covered walkway to Reception',
-        x: 24,
-        y: 66,
+        actionText: 'Follow walkway corridor back to Reception',
+        x: 14,
+        y: 94,
         direction: 'left',
         walkWaypoints: [
-          { x: 48, y: 88, scale: 1.0, facing: 'left' },
-          { x: 36, y: 78, scale: 0.80, facing: 'left' },
-          { x: 24, y: 66, scale: 0.60, facing: 'away' }
+          { x: 16, y: 92, scale: 0.95, facing: 'towards' },
+          { x: 14, y: 96, scale: 1.05, facing: 'towards' }
         ]
       },
       {
@@ -740,13 +753,14 @@ export const exploreLocations: ExploreLocation[] = [
         targetLocationId: 'adventure',
         label: 'Canopy Adventure Zone',
         actionText: 'Ascend forest trail to Adventure Zone',
-        x: 84,
-        y: 54,
+        x: 26,
+        y: 58,
         direction: 'forward',
         walkWaypoints: [
-          { x: 50, y: 88, scale: 1.0, facing: 'right' },
-          { x: 68, y: 72, scale: 0.75, facing: 'right' },
-          { x: 84, y: 54, scale: 0.50, facing: 'away' }
+          { x: 16, y: 92, scale: 0.95, facing: 'away' },
+          { x: 18, y: 82, scale: 0.80, facing: 'away' },
+          { x: 22, y: 70, scale: 0.65, facing: 'away' },
+          { x: 26, y: 58, scale: 0.50, facing: 'away' }
         ]
       }
     ]

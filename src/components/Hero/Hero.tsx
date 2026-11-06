@@ -1,30 +1,25 @@
 import React from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { ParkOverviewCard } from './ParkOverviewCard';
 import { Navbar } from '../Navbar/Navbar';
 
 interface HeroProps {
   activeTab: string;
   onSelectTab: (tab: string) => void;
-  onOpenQR: () => void;
   onOpenAbout: () => void;
   onScrollToFacilities: () => void;
-  onScrollToMap: () => void;
   onExploreClick: () => void;
-  onSelectFacility: (facilityId: string) => void;
-  onViewFullMap: () => void;
+  onOpenQR?: () => void;
+  onScrollToMap?: () => void;
+  onSelectFacility?: (facilityId: string) => void;
+  onViewFullMap?: () => void;
 }
 
 export const Hero: React.FC<HeroProps> = ({
   activeTab,
   onSelectTab,
-  onOpenQR,
   onOpenAbout,
   onScrollToFacilities,
-  onScrollToMap,
-  onExploreClick,
-  onSelectFacility,
-  onViewFullMap
+  onExploreClick
 }) => {
   return (
     <section className="relative w-full max-w-[1400px] mx-auto px-2 sm:px-3 mb-1.5 sm:mb-2">
@@ -45,10 +40,8 @@ export const Hero: React.FC<HeroProps> = ({
         <Navbar
           activeTab={activeTab}
           onSelectTab={onSelectTab}
-          onOpenQR={onOpenQR}
           onOpenAbout={onOpenAbout}
           onScrollToFacilities={onScrollToFacilities}
-          onScrollToMap={onScrollToMap}
         />
 
         {/* Hero Main Content Row */}
@@ -88,14 +81,6 @@ export const Hero: React.FC<HeroProps> = ({
               <span>Explore Park</span>
               <ArrowRight className="w-3.5 h-3.5 text-black group-hover:translate-x-1 transition-transform stroke-[2.5]" />
             </button>
-          </div>
-
-          {/* Right Floating Park Overview Card */}
-          <div className="flex-shrink-0 flex justify-end">
-            <ParkOverviewCard
-              onSelectFacility={onSelectFacility}
-              onViewFullMap={onViewFullMap}
-            />
           </div>
         </div>
       </div>

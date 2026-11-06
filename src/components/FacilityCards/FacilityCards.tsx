@@ -23,7 +23,7 @@ export const FacilityCards: React.FC<FacilityCardsProps> = ({
 }) => {
   return (
     <section id="facilities-section" className="w-full max-w-[1400px] mx-auto px-2 sm:px-3 mb-1.5 sm:mb-2">
-      {/* 6 cards in a horizontal row matching reference */}
+      {/* 6 cards in a compact horizontal row matching reference */}
       <div className="grid grid-cols-6 gap-1.5 sm:gap-2">
         {facilities.map((fac) => {
           const Icon = iconMap[fac.iconName] || Trees;

@@ -9,6 +9,7 @@ interface ParkMapGuideProps {
   activeRoute: RouteData | null;
   activeStepIndex?: number;
   onSelectDestination: (destId: string) => void;
+  onExploreRoute?: (destId: string) => void;
 }
 
 export const ParkMapGuide: React.FC<ParkMapGuideProps> = ({
@@ -16,7 +17,8 @@ export const ParkMapGuide: React.FC<ParkMapGuideProps> = ({
   currentLocationId,
   activeRoute,
   activeStepIndex = 0,
-  onSelectDestination
+  onSelectDestination,
+  onExploreRoute
 }) => {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [showTooltip, setShowTooltip] = useState<boolean>(true);
@@ -38,7 +40,7 @@ export const ParkMapGuide: React.FC<ParkMapGuideProps> = ({
   const activeStepPos = currentStep?.pathPoints?.[0] || null;
 
   return (
-    <div id="map-section" className="glass-panel rounded-2xl p-2 sm:p-2.5 flex flex-col justify-between h-[164px] xl:h-[240px] shadow-2xl relative">
+    <div id="map-section" className="glass-panel rounded-2xl p-2 sm:p-2.5 flex flex-col justify-between h-[164px] xl:h-[240px] shadow-2xl relative w-full">
       {/* Header */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
@@ -47,12 +49,25 @@ export const ParkMapGuide: React.FC<ParkMapGuideProps> = ({
             Park Map Guide
           </h3>
         </div>
-        {activeRoute && (
-          <div className="text-[9.5px] lg:text-[10px] text-[#34f480] bg-[#122e1b] px-2 py-0.5 rounded-full border border-[#28e070]/30 font-semibold flex items-center gap-1">
-            <Navigation className="w-2.5 h-2.5" />
-            <span>{activeRoute.distance} • {activeRoute.duration}</span>
-          </div>
-        )}
+        
+        <div className="flex items-center gap-1.5">
+          {activeRoute && (
+            <div className="text-[9.5px] lg:text-[10px] text-[#34f480] bg-[#122e1b] px-2 py-0.5 rounded-full border border-[#28e070]/30 font-semibold flex items-center gap-1 shadow-sm">
+              <Navigation className="w-2.5 h-2.5" />
+              <span>{activeRoute.distance} • {activeRoute.duration}</span>
+            </div>
+          )}
+
+          {onExploreRoute && (
+            <button
+              onClick={() => onExploreRoute(selectedDestinationId)}
+              className="hidden lg:flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#28e070] hover:bg-[#34f480] text-black text-[10px] font-bold transition-all cursor-pointer shadow-sm active:scale-95"
+            >
+              <Compass className="w-3 h-3" />
+              <span>Explore Mode →</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Map Interactive Canvas */}

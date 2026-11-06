@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   X, ChevronLeft, ChevronRight, MapPin, Compass, 
   Utensils, Waves, Bed, Trees, Activity, Home, ArrowUp, ArrowLeft, ArrowRight, ArrowDown,
-  Volume2, VolumeX, Sparkles, Footprints
+  Volume2, VolumeX, Sparkles, Footprints, ChevronUp, ChevronDown, Navigation, CheckCircle2, QrCode
 } from 'lucide-react';
 import { exploreLocations } from '../../data/exploreLocations';
 import type { ExploreLocation, Hotspot, WalkWaypoint } from '../../data/exploreLocations';
@@ -10,8 +10,10 @@ import { WalkingCharacter } from './WalkingCharacter';
 
 interface ExploreModeProps {
   initialLocationId?: string;
+  initialDestinationId?: string;
   onExit: () => void;
   onSelectOnParkMap?: (locationId: string) => void;
+  onOpenQR?: () => void;
 }
 
 const categoryIcons = {
@@ -30,6 +32,32 @@ const directionIcons = {
   back: ArrowDown,
 };
 
+// Verified obstacle-free ground spawn coordinates for each station
+const STATION_SPAWN_COORDS: Record<string, { x: number; y: number; scale: number; facing: 'away' | 'left' | 'right' | 'towards' }> = {
+  entrance: { x: 50, y: 92, scale: 1.0, facing: 'away' },
+  reception: { x: 22, y: 88, scale: 0.95, facing: 'away' },
+  restaurant_exterior: { x: 58, y: 95, scale: 1.0, facing: 'away' },
+  restaurant_dining: { x: 50, y: 95, scale: 1.0, facing: 'away' },
+  pool: { x: 8, y: 84, scale: 0.95, facing: 'away' },
+  cottages: { x: 48, y: 94, scale: 1.0, facing: 'away' },
+  garden: { x: 24, y: 95, scale: 1.0, facing: 'away' },
+  adventure: { x: 12, y: 88, scale: 0.95, facing: 'away' },
+  spa: { x: 16, y: 92, scale: 0.95, facing: 'away' }
+};
+
+// Station connectivity graph for multi-station route planning
+const STATION_ADJACENCY: Record<string, string[]> = {
+  entrance: ['reception', 'cottages'],
+  reception: ['entrance', 'restaurant_exterior', 'pool'],
+  restaurant_exterior: ['reception', 'restaurant_dining', 'pool'],
+  restaurant_dining: ['restaurant_exterior', 'pool'],
+  pool: ['reception', 'restaurant_exterior', 'cottages', 'spa'],
+  cottages: ['entrance', 'pool', 'garden'],
+  garden: ['cottages', 'pool', 'adventure'],
+  adventure: ['garden', 'spa'],
+  spa: ['pool', 'adventure', 'reception']
+};
+
 interface ActiveWalkState {
   isActive: boolean;
   targetHotspot: Hotspot | null;
@@ -42,37 +70,39 @@ interface ActiveWalkState {
   trailPoints: { x: number; y: number }[];
 }
 
-interface ArrivalInfo {
-  location: ExploreLocation;
-  subName?: string;
-  previousActionLabel: string;
-}
-
 export const ExploreMode: React.FC<ExploreModeProps> = ({
   initialLocationId = 'entrance',
+  initialDestinationId = 'restaurant_exterior',
   onExit,
-  onSelectOnParkMap
+  onSelectOnParkMap,
+  onOpenQR
 }) => {
-  const [currentLocationId, setCurrentLocationId] = useState<string>(initialLocationId);
+  // Guaranteed starting location defaults strictly to Main Entrance
+  const [currentLocationId, setCurrentLocationId] = useState<string>(initialLocationId || 'entrance');
   const [currentSubId, setCurrentSubId] = useState<string | null>(null);
   const [showMiniMap, setShowMiniMap] = useState<boolean>(false);
   const [isCrossFading, setIsCrossFading] = useState<boolean>(false);
   const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
+
+  // Compact right-side destination panel state
+  const [selectedDestinationId, setSelectedDestinationId] = useState<string>(initialDestinationId || 'restaurant_exterior');
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState<boolean>(false);
+  const [lastArrivedStation, setLastArrivedStation] = useState<string | null>(null);
+
+  // Initial spawn coordinates for the starting station
+  const defaultSpawn = STATION_SPAWN_COORDS[initialLocationId] || STATION_SPAWN_COORDS.entrance;
 
   // Active walking character & glowing trail state
   const [walkState, setWalkState] = useState<ActiveWalkState>({
     isActive: false,
     targetHotspot: null,
     targetLocationId: '',
-    currentX: 50,
-    currentY: 90,
-    currentScale: 1.0,
-    currentFacing: 'away',
+    currentX: defaultSpawn.x,
+    currentY: defaultSpawn.y,
+    currentScale: defaultSpawn.scale,
+    currentFacing: defaultSpawn.facing,
     trailPoints: [],
   });
-
-  // Arrival Guidance card state
-  const [arrivalInfo, setArrivalInfo] = useState<ArrivalInfo | null>(null);
 
   // Animation frame reference
   const animFrameRef = useRef<number | null>(null);
@@ -139,7 +169,6 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       if (!ctx) return;
 
       try {
-        // Create pink/breeze noise buffer
         const bufferSize = ctx.sampleRate * 2;
         const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const output = noiseBuffer.getChannelData(0);
@@ -160,13 +189,12 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
         whiteNoise.buffer = noiseBuffer;
         whiteNoise.loop = true;
 
-        // Bandpass filter to sound like soft rustling pine trees
         const filter = ctx.createBiquadFilter();
         filter.type = 'lowpass';
         filter.frequency.value = 650;
 
         const gain = ctx.createGain();
-        gain.gain.value = 0.08; // Soft volume
+        gain.gain.value = 0.08;
 
         whiteNoise.connect(filter);
         filter.connect(gain);
@@ -210,33 +238,61 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
     activeHotspots = sub.hotspots;
   }
 
-  // Generate fallback 3-point waypoints if a hotspot lacks explicit coordinates
+  // Calculate shortest path sequence between current location and selected destination
+  const calculateStationRoute = useCallback((startId: string, endId: string): string[] => {
+    if (startId === endId) return [startId];
+    const queue: string[][] = [[startId]];
+    const visited = new Set<string>([startId]);
+
+    while (queue.length > 0) {
+      const path = queue.shift()!;
+      const curr = path[path.length - 1];
+
+      const neighbors = STATION_ADJACENCY[curr] || [];
+      for (const next of neighbors) {
+        if (next === endId) {
+          return [...path, next];
+        }
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push([...path, next]);
+        }
+      }
+    }
+    return [startId, endId];
+  }, []);
+
+  const activeRoute = calculateStationRoute(currentLocationId, selectedDestinationId);
+  const nextTargetStationId = activeRoute.length > 1 ? activeRoute[1] : null;
+
+  // Find the hotspot that leads to the next target station
+  const nextRouteHotspot = nextTargetStationId 
+    ? activeHotspots.find((h) => h.targetLocationId === nextTargetStationId) || activeHotspots[0]
+    : null;
+
+  // Fallback safe waypoints if a custom hotspot lacks coordinates
   const getWaypointsForHotspot = (hs: Hotspot): WalkWaypoint[] => {
     if (hs.walkWaypoints && hs.walkWaypoints.length > 0) {
       return hs.walkWaypoints;
     }
-    const startX = 50;
-    const startY = 90;
-    const midX = (startX + hs.x) / 2;
-    const midY = (startY + hs.y) / 2;
-    const facing: 'left' | 'right' | 'away' = 
-      hs.direction === 'left' ? 'left' : hs.direction === 'right' ? 'right' : 'away';
-
+    const spawn = STATION_SPAWN_COORDS[currentLocationId] || { x: 50, y: 92, scale: 1.0, facing: 'away' };
+    const midX = (spawn.x + hs.x) / 2;
+    const midY = (spawn.y + hs.y) / 2;
     return [
-      { x: startX, y: startY, scale: 1.0, facing },
-      { x: midX, y: midY, scale: 0.75, facing },
-      { x: hs.x, y: hs.y, scale: 0.52, facing }
+      { x: spawn.x, y: spawn.y, scale: spawn.scale, facing: spawn.facing },
+      { x: midX, y: midY, scale: (spawn.scale + 0.5) / 2, facing: hs.direction === 'left' ? 'left' : 'away' },
+      { x: hs.x, y: hs.y, scale: 0.5, facing: 'away' }
     ];
   };
 
-  // Start continuous walking character & glowing trail along the pathway
+  // Start continuous walking character & glowing trail along the obstacle-avoiding pathway
   const startWalkingToHotspot = useCallback((hs: Hotspot) => {
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
 
-    setArrivalInfo(null); // Clear previous arrival card
+    setLastArrivedStation(null);
 
     const waypoints = getWaypointsForHotspot(hs);
     const startPt = waypoints[0];
@@ -252,7 +308,6 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       totalDist += dist;
     }
 
-    // Set initial walking state
     setWalkState({
       isActive: true,
       targetHotspot: hs,
@@ -321,11 +376,11 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
         // Destination threshold reached! Cross-fade to next station
         setIsCrossFading(true);
         setTimeout(() => {
-          setCurrentLocationId(hs.targetLocationId);
+          const nextLocId = hs.targetLocationId;
+          setCurrentLocationId(nextLocId);
           setCurrentSubId(hs.targetSubId || null);
 
-          // Find target location for arrival guidance
-          const nextTargetLoc = exploreLocations.find((l) => l.id === hs.targetLocationId);
+          const newSpawn = STATION_SPAWN_COORDS[nextLocId] || { x: 50, y: 92, scale: 1.0, facing: 'away' };
 
           setTimeout(() => {
             setIsCrossFading(false);
@@ -333,27 +388,21 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
               isActive: false,
               targetHotspot: null,
               targetLocationId: '',
-              currentX: 50,
-              currentY: 90,
-              currentScale: 1.0,
-              currentFacing: 'away',
+              currentX: newSpawn.x,
+              currentY: newSpawn.y,
+              currentScale: newSpawn.scale,
+              currentFacing: newSpawn.facing,
               trailPoints: [],
             });
 
-            if (nextTargetLoc) {
-              setArrivalInfo({
-                location: nextTargetLoc,
-                subName: hs.targetSubId,
-                previousActionLabel: hs.label,
-              });
-            }
+            setLastArrivedStation(nextLocId);
           }, 200);
         }, 180);
       }
     };
 
     animFrameRef.current = requestAnimationFrame(animateWalk);
-  }, [playFootstepSound]);
+  }, [currentLocationId, playFootstepSound]);
 
   // Instant location jump (from minimap or bottom bar tabs)
   const handleJumpLocation = (locId: string, subId?: string) => {
@@ -361,8 +410,18 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
-    setWalkState((prev) => ({ ...prev, isActive: false, trailPoints: [] }));
-    setArrivalInfo(null);
+    const newSpawn = STATION_SPAWN_COORDS[locId] || { x: 50, y: 92, scale: 1.0, facing: 'away' };
+    setLastArrivedStation(null);
+    setWalkState({
+      isActive: false,
+      targetHotspot: null,
+      targetLocationId: '',
+      currentX: newSpawn.x,
+      currentY: newSpawn.y,
+      currentScale: newSpawn.scale,
+      currentFacing: newSpawn.facing,
+      trailPoints: [],
+    });
     setIsCrossFading(true);
     setTimeout(() => {
       setCurrentLocationId(locId);
@@ -410,6 +469,7 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
     : '';
 
   const Icon = categoryIcons[loc.category] || Trees;
+  const isAtFinalDestination = currentLocationId === selectedDestinationId;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#070d0a] text-white flex flex-col justify-between overflow-hidden animate-fadeIn select-none">
@@ -469,13 +529,12 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
         {walkState.isActive && walkState.targetHotspot && (
           <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#1b4328]/90 border border-[#34f480] text-[#34f480] text-xs font-bold animate-pulse shadow-[0_0_15px_rgba(52,244,128,0.4)]">
             <Footprints className="w-3.5 h-3.5" />
-            <span>Walking along pathway to {walkState.targetHotspot.label}...</span>
+            <span>Walking to {walkState.targetHotspot.label}...</span>
           </div>
         )}
 
         {/* Right Controls: Ambient Sound, Mini-Map Toggle & Exit */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Nature Ambience Audio Toggle */}
           <button
             onClick={toggleAudio}
             title={isAudioPlaying ? 'Mute Forest Ambiance' : 'Play Gentle Forest Ambiance'}
@@ -498,7 +557,17 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
             )}
           </button>
 
-          {/* Park Mini-Map Toggle */}
+          {onOpenQR && (
+            <button
+              onClick={onOpenQR}
+              className="px-2.5 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer bg-white/10 text-white hover:bg-white/20 border border-white/15"
+              title="Scan Real Park QR Code"
+            >
+              <QrCode className="w-3.5 h-3.5 text-[#34f480]" />
+              <span className="hidden sm:inline">Scan QR</span>
+            </button>
+          )}
+
           <button
             onClick={() => setShowMiniMap(!showMiniMap)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
@@ -511,7 +580,6 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
             <span className="hidden sm:inline">Park Map</span>
           </button>
 
-          {/* Exit Explore Mode */}
           <button
             onClick={onExit}
             className="px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-white font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow"
@@ -624,16 +692,14 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
           </svg>
         )}
 
-        {/* 2B. Animated Walking Character Avatar */}
-        {walkState.isActive && (
-          <WalkingCharacter
-            x={walkState.currentX}
-            y={walkState.currentY}
-            scale={walkState.currentScale}
-            facing={walkState.currentFacing}
-            isMoving={true}
-          />
-        )}
+        {/* 2B. Walking Character Avatar (Station Spawn Point when idle, moving along path when active) */}
+        <WalkingCharacter
+          x={walkState.currentX}
+          y={walkState.currentY}
+          scale={walkState.currentScale}
+          facing={walkState.currentFacing}
+          isMoving={walkState.isActive}
+        />
 
         {/* 2C. Clickable Directional Hotspot Arrows (Hidden during active walking) */}
         {!walkState.isActive && activeHotspots.map((hs) => {
@@ -651,7 +717,6 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
               style={{ left: `${hs.x}%`, top: `${hs.y}%` }}
               className="absolute transform -translate-x-1/2 -translate-y-1/2 z-20 group cursor-pointer"
             >
-              {/* Radar Wave Pulse Ring & Direction Arrow */}
               <div className="relative flex items-center justify-center">
                 <div className="w-12 h-12 rounded-full bg-[#28e070]/30 pulse-circle absolute" />
                 <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#28e070] text-black flex items-center justify-center shadow-[0_0_20px_#28e070] group-hover:scale-115 transition-transform border-2 border-white">
@@ -659,13 +724,13 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                 </div>
               </div>
 
-              {/* Informative Tooltip with Destination Preview Image on Hover */}
-              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 p-1.5 rounded-xl bg-black/95 backdrop-blur-md border border-white/20 text-white shadow-2xl transition-all duration-300 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:border-[#34f480] min-w-[210px] max-w-[280px] z-30">
+              {/* Tooltip on Hover */}
+              <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 p-1.5 rounded-xl bg-black/95 backdrop-blur-md border border-white/20 text-white shadow-2xl transition-all duration-300 opacity-0 group-hover:opacity-100 pointer-events-none group-hover:border-[#34f480] min-w-[200px] max-w-[260px] z-30">
                 <div className="flex items-center gap-2">
                   <img 
                     src={previewImg} 
                     alt={hs.label} 
-                    className="w-13 h-10 object-cover rounded-lg border border-white/20 flex-shrink-0 shadow-md"
+                    className="w-12 h-9 object-cover rounded-lg border border-white/20 flex-shrink-0 shadow-md"
                   />
                   <div className="flex flex-col text-left min-w-0 pr-1">
                     <div className="flex items-center gap-1">
@@ -674,12 +739,12 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                         {hs.label}
                       </span>
                     </div>
-                    <span className="text-[9.5px] text-gray-300 font-normal leading-tight line-clamp-2 mt-0.5">
+                    <span className="text-[9px] text-gray-300 font-normal leading-tight line-clamp-1 mt-0.5">
                       {hs.actionText}
                     </span>
                     <span className="text-[9px] text-[#34f480] font-semibold mt-0.5 flex items-center gap-1">
                       <Footprints className="w-2.5 h-2.5" />
-                      <span>Click to walk along path</span>
+                      <span>Click arrow to walk</span>
                     </span>
                   </div>
                 </div>
@@ -688,64 +753,117 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
           );
         })}
 
-        {/* 2D. Destination Arrival Guidance Card & Continuous Journey Suggestions */}
-        {arrivalInfo && !walkState.isActive && (
-          <div 
-            data-testid="arrival-card"
-            className="absolute bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-40 w-[92%] sm:w-[460px] bg-[#0c1811]/95 backdrop-blur-2xl border border-[#34f480]/60 rounded-2xl p-4 sm:p-5 shadow-[0_12px_45px_rgba(0,0,0,0.85),0_0_35px_rgba(52,244,128,0.25)] animate-scaleUp"
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="px-2.5 py-0.5 rounded-full bg-[#1b3b27] text-[#34f480] text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 border border-[#34f480]/40">
-                <Sparkles className="w-3 h-3 text-[#34f480]" />
-                <span>Arrived at Station</span>
+        {/* 2D. Compact Right-Side Destination Panel (Does not obstruct path or character) */}
+        <div 
+          data-testid="destination-panel"
+          className={`absolute z-40 transition-all duration-300 ${
+            /* Desktop: Upper right corner, max width 270px | Mobile: Compact bottom sheet */
+            'top-14 sm:top-16 right-3 sm:right-6 w-[270px] max-w-[85vw] ' +
+            'bg-[#0b1610]/95 backdrop-blur-2xl border border-[#34f480]/40 rounded-2xl p-2.5 sm:p-3 shadow-[0_8px_30px_rgba(0,0,0,0.85)]'
+          }`}
+        >
+          {/* Panel Header */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-5 h-5 rounded-full bg-[#1b3b27] text-[#34f480] flex items-center justify-center flex-shrink-0 border border-[#34f480]/40">
+                <Navigation className="w-3 h-3" />
               </span>
-              <button
-                onClick={() => setArrivalInfo(null)}
-                className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
-                title="Dismiss and explore"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-              {arrivalInfo.location.name}
-            </h3>
-            <p className="text-xs text-gray-300 mt-1 mb-3 line-clamp-2">
-              {arrivalInfo.location.description}
-            </p>
-
-            {/* Continuous Journey Next Suggestions */}
-            <div className="border-t border-white/10 pt-2.5">
-              <p className="text-[10px] text-[#34f480] font-bold uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Footprints className="w-3 h-3" />
-                <span>Continue Your Park Walk:</span>
-              </p>
-              <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto pr-0.5">
-                {activeHotspots.map((nextHs) => {
-                  const NextDirIcon = directionIcons[nextHs.direction || 'forward'];
-                  return (
-                    <button
-                      key={nextHs.id}
-                      onClick={() => startWalkingToHotspot(nextHs)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/10 hover:bg-[#28e070] text-white hover:text-black font-semibold text-xs transition-all border border-white/15 cursor-pointer group shadow"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="w-6 h-6 rounded-full bg-[#1b3b27] group-hover:bg-black text-[#34f480] group-hover:text-white flex items-center justify-center flex-shrink-0 transition-colors">
-                          <NextDirIcon className="w-3.5 h-3.5" />
-                        </div>
-                        <span className="truncate">{nextHs.label}</span>
-                      </div>
-                      <span className="text-[10px] opacity-75 font-normal ml-2 flex-shrink-0 group-hover:text-black">
-                        Walk Path →
-                      </span>
-                    </button>
-                  );
-                })}
+              <div className="truncate">
+                <span className="text-[11px] font-extrabold text-white block truncate leading-none">
+                  {lastArrivedStation ? 'Arrived at Station' : 'Park Navigator'}
+                </span>
+                <span className="text-[9px] text-[#34f480] font-semibold block truncate mt-0.5">
+                  📍 At: {loc.name.split('—')[0].split('&')[0].trim()}
+                </span>
               </div>
             </div>
+
+            <button
+              onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
+              className="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              title={isPanelCollapsed ? 'Expand Navigation Guide' : 'Collapse Panel'}
+            >
+              {isPanelCollapsed ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+            </button>
           </div>
-        )}
+
+          {/* Panel Expanded Body */}
+          {!isPanelCollapsed && (
+            <div className="flex flex-col gap-2 pt-2 text-xs">
+              {/* Destination Selector Dropdown */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] text-gray-300 font-semibold flex items-center justify-between">
+                  <span>Target Destination:</span>
+                  {isAtFinalDestination && (
+                    <span className="text-[#34f480] flex items-center gap-0.5 font-bold">
+                      <CheckCircle2 className="w-3 h-3" /> Reached
+                    </span>
+                  )}
+                </label>
+                <select
+                  value={selectedDestinationId}
+                  onChange={(e) => {
+                    setSelectedDestinationId(e.target.value);
+                    setLastArrivedStation(null);
+                  }}
+                  className="w-full bg-black/60 border border-white/20 rounded-xl px-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#34f480] cursor-pointer"
+                >
+                  {exploreLocations.map((dest) => (
+                    <option key={dest.id} value={dest.id} className="bg-[#0b120e] text-white">
+                      {dest.name.split('—')[0].split('&')[0].trim()}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Multi-Station Route Indicator & Next Leg Action */}
+              {!isAtFinalDestination && nextRouteHotspot && (
+                <div className="p-2 rounded-xl bg-[#132c1c] border border-[#34f480]/50 flex flex-col gap-1.5 shadow-inner">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-gray-300 font-medium">Next Route Leg:</span>
+                    <span className="text-[#34f480] font-bold">Step 1 of {Math.max(1, activeRoute.length - 1)}</span>
+                  </div>
+                  <button
+                    disabled={walkState.isActive}
+                    onClick={() => startWalkingToHotspot(nextRouteHotspot)}
+                    className="w-full py-1.5 px-2.5 rounded-lg bg-[#28e070] hover:bg-[#34f480] text-black font-extrabold text-[11px] flex items-center justify-center gap-1.5 shadow-md shadow-[#28e070]/25 transition-all cursor-pointer disabled:opacity-50"
+                  >
+                    <Footprints className="w-3.5 h-3.5" />
+                    <span className="truncate">Walk to {nextRouteHotspot.label.split('&')[0].trim()}</span>
+                  </button>
+                </div>
+              )}
+
+              {/* All Connected Immediate Pathways */}
+              <div className="flex flex-col gap-1 pt-1 border-t border-white/10">
+                <span className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider block">
+                  Available Pathways ({activeHotspots.length}):
+                </span>
+                <div className="flex flex-col gap-1 max-h-[130px] overflow-y-auto pr-0.5">
+                  {activeHotspots.map((hs) => {
+                    const HsDirIcon = directionIcons[hs.direction || 'forward'];
+                    return (
+                      <button
+                        key={hs.id}
+                        disabled={walkState.isActive}
+                        onClick={() => startWalkingToHotspot(hs)}
+                        className="w-full flex items-center justify-between px-2 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-white hover:text-[#34f480] transition-colors border border-white/10 cursor-pointer disabled:opacity-50 text-[11px] group text-left"
+                      >
+                        <div className="flex items-center gap-1.5 truncate min-w-0 pr-1">
+                          <HsDirIcon className="w-3 h-3 text-[#34f480] flex-shrink-0" />
+                          <span className="truncate">{hs.label.split('&')[0].trim()}</span>
+                        </div>
+                        <span className="text-[9.5px] text-[#34f480] font-bold flex-shrink-0 group-hover:translate-x-0.5 transition-transform">
+                          Walk →
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Left & Right Chevrons */}
         {!walkState.isActive && (
@@ -753,17 +871,17 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
             <button
               onClick={handlePrev}
               aria-label="Previous Location"
-              className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/75 hover:bg-[#28e070] hover:text-black border border-white/25 text-white flex items-center justify-center backdrop-blur-md transition-all shadow-2xl active:scale-95 cursor-pointer"
+              className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/75 hover:bg-[#28e070] hover:text-black border border-white/25 text-white flex items-center justify-center backdrop-blur-md transition-all shadow-2xl active:scale-95 cursor-pointer"
             >
-              <ChevronLeft className="w-6 h-6 stroke-[2.5]" />
+              <ChevronLeft className="w-5 h-5 stroke-[2.5]" />
             </button>
 
             <button
               onClick={handleNext}
               aria-label="Next Location"
-              className="absolute right-4 sm:right-6 top-1/2 -translate-y-1/2 z-20 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-black/75 hover:bg-[#28e070] hover:text-black border border-white/25 text-white flex items-center justify-center backdrop-blur-md transition-all shadow-2xl active:scale-95 cursor-pointer"
+              className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-black/75 hover:bg-[#28e070] hover:text-black border border-white/25 text-white flex items-center justify-center backdrop-blur-md transition-all shadow-2xl active:scale-95 cursor-pointer"
             >
-              <ChevronRight className="w-6 h-6 stroke-[2.5]" />
+              <ChevronRight className="w-5 h-5 stroke-[2.5]" />
             </button>
           </>
         )}
@@ -791,7 +909,6 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
                 className="w-full h-full object-cover"
               />
 
-              {/* Waypoints on Mini-Map */}
               {exploreLocations.map((el) => {
                 const isCur = el.id === currentLocationId;
                 return (
@@ -822,20 +939,19 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
       </main>
 
       {/* 3. Bottom Information Panel & 9-Station Trail Timeline */}
-      <footer className="relative z-30 px-4 sm:px-6 py-2.5 bg-[#0a120e]/95 backdrop-blur-xl border-t border-white/10 flex flex-col gap-2">
-        {/* Info Row: Title & Rich Description */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2.5">
+      <footer className="relative z-30 px-4 sm:px-6 py-2 bg-[#0a120e]/95 backdrop-blur-xl border-t border-white/10 flex flex-col gap-1.5">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-0.5">
               <span className="px-2 py-0.5 rounded-full bg-[#1b3b27] text-[#34f480] text-[10px] font-bold border border-[#34f480]/40 flex items-center gap-1">
                 <Sparkles className="w-2.5 h-2.5" />
                 <span>{loc.badge}</span>
               </span>
-              <h2 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+              <h2 className="text-sm sm:text-base font-extrabold text-white tracking-tight">
                 {activeTitle}
               </h2>
             </div>
-            <p className="text-xs text-gray-300 leading-relaxed font-normal">
+            <p className="text-xs text-gray-300 leading-relaxed font-normal line-clamp-1">
               {activeDescription}
             </p>
           </div>
@@ -856,16 +972,16 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
 
             <button
               onClick={handleNext}
-              className="px-4 py-2 rounded-full bg-[#28e070] hover:bg-[#34f480] text-black font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-[#28e070]/30 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-full bg-[#28e070] hover:bg-[#34f480] text-black font-extrabold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-[#28e070]/30 cursor-pointer"
             >
               <span>Next Station</span>
-              <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+              <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
         {/* Sequential 9-Station Trail Timeline */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-1 border-t border-white/5 select-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 pt-0.5 border-t border-white/5 select-none">
           {exploreLocations.map((el, i) => {
             const isCur = el.id === currentLocationId;
             const ElIcon = categoryIcons[el.category] || Trees;
@@ -874,18 +990,18 @@ export const ExploreMode: React.FC<ExploreModeProps> = ({
               <button
                 key={el.id}
                 onClick={() => handleJumpLocation(el.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium transition-all whitespace-nowrap cursor-pointer ${
                   isCur
-                    ? 'bg-[#1b4328] text-[#34f480] border border-[#34f480] font-bold shadow-md'
+                    ? 'bg-[#1b4328] text-[#34f480] border border-[#34f480] font-bold shadow-sm'
                     : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
                 }`}
               >
-                <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] ${
+                <span className={`w-3 h-3 rounded-full flex items-center justify-center text-[8.5px] ${
                   isCur ? 'bg-[#34f480] text-black font-extrabold' : 'bg-white/10 text-gray-400'
                 }`}>
                   {i + 1}
                 </span>
-                <ElIcon className="w-3 h-3" />
+                <ElIcon className="w-2.5 h-2.5" />
                 <span>{el.name.split('—')[0].split('&')[0].trim()}</span>
               </button>
             );
